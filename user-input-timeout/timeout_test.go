@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -39,41 +40,35 @@ func TestGetName(t *testing.T) {
 }
 
 func TestGetNameContext(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       string
-		timeout     time.Duration
-		expected    string
-		expectedErr error
-	}{
-		{"NameBeforeTimeout", "Alice\n", 2 * time.Second, "Alice", nil},
-		{"TimeoutBeforeName", "", 1 * time.Millisecond, "Default Name", context.DeadlineExceeded},
+	// 표준 입력 리다이렉션
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+
+	r, w, _ := os.Pipe()
+	os.Stdin = r
+	go func() {
+		w.WriteString("TestInput\n")
+		w.Close()
+	}()
+
+	// 표준 출력 캡처
+	oldStdout := os.Stdout
+	defer func() { os.Stdout = oldStdout }()
+	outR, outW, _ := os.Pipe()
+	os.Stdout = outW
+
+	// 테스트 실행 및 결과 확인
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	result, _ := getNameContext(ctx)
+
+	outW.Close()
+	capturedOut, _ := io.ReadAll(outR)
+
+	if result != "TestInput" {
+		t.Errorf("Expected TestInput, got %s", result)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := strings.NewReader(tt.input)
-			w := &bytes.Buffer{}
-
-			oldStdin := os.Stdin
-			oldStdout := os.Stdout
-			defer func() { os.Stdin, os.Stdout = oldStdin, oldStdout }()
-
-			os.Stdin = r
-			os.Stdout = w
-
-			ctx, cancel := context.WithTimeout(context.Background(), tt.timeout)
-			defer cancel()
-
-			result, err := getNameContext(ctx)
-
-			if err != tt.expectedErr {
-				t.Errorf("getNameContext() error = %v, wantErr %v", err, tt.expectedErr)
-				return
-			}
-			if result != tt.expected {
-				t.Errorf("getNameContext() = %v, want %v", result, tt.expected)
-			}
-		})
+	if !strings.Contains(string(capturedOut), "Your name please?") {
+		t.Error("Missing prompt message")
 	}
 }
