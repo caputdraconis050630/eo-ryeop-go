@@ -54,7 +54,7 @@ func main() {
 	name, err := getNameContext(ctx)
 
 	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-		fmt.Fprintln(os.Stdout, "%v\n", err)
+		fmt.Fprintf(os.Stdout, "%v\n", err)
 		os.Exit(1)
 	}
 	fmt.Fprintln(os.Stdout, name)
