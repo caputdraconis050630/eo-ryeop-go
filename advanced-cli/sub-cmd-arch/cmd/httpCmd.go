@@ -40,6 +40,14 @@ http: <options> server`
 		return ErrNoServerSpecified
 	}
 
+	switch v {
+	case "GET", "POST", "HEAD":
+		// do nothing
+	default:
+		fmt.Println("Invalid HTTP method")
+		return ErrInvalidHTTPMethod
+	}
+
 	c := httpConfig{verb: v}
 	c.url = fs.Arg(0)
 	fmt.Fprintln(w, "Executing http command")
